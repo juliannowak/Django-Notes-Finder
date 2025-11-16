@@ -1,0 +1,10 @@
+<h1>search for song</h1>
+
+<form method="post">
+    {% csrf_token %}
+    <table>
+        {{ form.as_table }}
+    </table>
+    <!-- <input type="text" name="search_term" placeholder=""> -->
+    <button type="submit">Search</button>
+</form>

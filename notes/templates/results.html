@@ -1,0 +1,8 @@
+{% if results %}
+  {% for name, midi in results %}
+    <h4>{{name}}</h4><br/>
+    <a style="display: block; text-indent: 50px;" href="{{midi}}">{{midi}}</a>
+  {% endfor %}
+{% else %}
+  <p>No midis found.</p>
+{% endif %}

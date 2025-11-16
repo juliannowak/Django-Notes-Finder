@@ -1,0 +1,7 @@
+*.sqlite3
+**/__pycache__/
+notes/btcdonate
+media/
+toolsMidi.py
+midiTools.py
+MidiSheetMusic.exe
