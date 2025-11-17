@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import Search, MidiResult
+from . import models
 # Register your models here.
-admin.site.register(Search)
-admin.site.register(MidiResult)
+admin.site.register(models.Search)
+admin.site.register(models.MidiResult)
+admin.site.register(models.Notes)

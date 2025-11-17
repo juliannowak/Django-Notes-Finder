@@ -10,7 +10,7 @@ import crawlMidiWorld as mw
 import crawlBitMidi as bm
 import os
 
-SITES = ['MidiWorld']
+SEARCH_SITES = ['MidiWorld']
 
 def trackToComposition(track):
     out_comp = Composition()
@@ -43,33 +43,34 @@ def make_notes(midi_path: str, site: str):
         return notes
         # LilyPond.to_pdf(LilyPond.from_Composition(out_comp),os.path.join(settings.MEDIA_ROOT, 'Midi World', f"{filename} all tracks")
 
-#TODO rewrite as crawler object and list comps
+#TODO rewrite as crawler object with list comps
 def create_search(search_term: str):
     search = models.Search.objects.filter(search_term=search_term).first()
     if search is None:
         dictMidi = mw.search(search_term)
         #dictBitMidi = bm.search(search_term)
         #print(dictMidi.keys())
-        models.Search.objects.create(search_term=search_term, dictMidi=dictMidi)
+        search = models.Search.objects.create(search_term=search_term, dictMidi=dictMidi)
+        #TODO create_result(site_name)
         try:
             os.makedirs(os.path.join(settings.MEDIA_ROOT, 'Midi World'))
             os.makedirs(os.path.join(settings.MEDIA_ROOT, 'Bit Midi'))
             os.makedirs(os.path.join(settings.MEDIA_ROOT, 'Free Midi'))
         except FileExistsError:
             pass
-        #download midis
+        #download midis, TODO thread and upload into folders further by file name, track number, transposition ?
         mw.scrape(dictMidi, os.path.join(settings.MEDIA_ROOT, 'Midi World'))
         #bm.scrape(dictBitMidi, os.path.join(settings.MEDIA_ROOT, 'Bit Midi'))
         #fm.scrape(dictFreeMidi, os.path.join(settings.MEDIA_ROOT, 'Free Midi'))
-        #TODO upload into folders further by file name, track number, transposition ?
-        #TODO modularize make_MidiResult(site_name)
+        
         for name in dictMidi.keys():
-            midi_name = os.path.join(settings.MEDIA_ROOT, 'Midi World', name)
-            notes = make_notes(midi_name)
-            if notes:
-                pass
+            midi = os.path.join(settings.MEDIA_ROOT, 'Midi World', name)
+            #notes = make_notes(midi)
+            # if notes:
+            #     pass
             #print(notes)
-            #TODO models.MidiResult.objects.create(midi_name=midi_name, midi, notes)
+            models.MidiResult.objects.create(midi_name=name, file_midi=midi, results=search)
+            #TODO thread: models.Notes.objects.create()
 
 #FORMS
 class SearchForm(forms.ModelForm):
@@ -105,3 +106,11 @@ def search(request):
     else:
         form = SearchForm()
     return render(request, 'search.html', {'form': form})
+
+def midi(request, midi_name):
+    #redirect()
+    #models.MidiResult.objects.filter(midi_name)
+    return render(request, 'midi.html', {'midi_name': midi_name})
+
+def notes(request):
+    pass
