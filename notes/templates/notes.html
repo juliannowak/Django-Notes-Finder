@@ -1,0 +1,11 @@
+{% if notes %}
+    <!-- add a another check box for png download-->
+  {% for name, track in notes %}
+    <h4>{{name}}</h4><br/>
+    <input type="checkbox" id="{{name}}" name="{{name}}" value="{{name}}">
+    <label for="{{name}}">Download {{name}}</label><br/>
+  {% endfor %}
+  <button type="button" onclick="downloadSelected()">Download Selected</button>
+{% else %}
+  <p>No notes found.</p>
+{% endif %}

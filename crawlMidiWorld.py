@@ -50,8 +50,12 @@ def scrape(data: dict, path=''):
         midi = session.get(data[song], stream = True) 
         
         fileName = song
+        
         if path != '':
             fileName = os.path.join(path, song)
+        else:
+            fileName = song
+        print("Saving %s" % fileName)
         
         with open(fileName + '.mid', 'wb') as file:
             for chunk in midi.iter_content(chunk_size=1024):
@@ -100,12 +104,19 @@ if __name__ == "__main__":
         if args.verbose:
             print(args.searchTerm)
         
-        #handle absolute paths
         if args.path == None:
-            print("yo")
-            args.path = os.path.join(os.getcwd(), "MidiWorld")
+            print("No path provided, saving to FreeMidi folder in current directory")
+            args.path = os.path.join(os.getcwd(), "FreeMidi")
+            if not os.path.exists(args.path):
+                os.makedirs(args.path)
         else:
-            args.path = os.path.join(os.getcwd())
+            if not os.path.isabs(args.path):
+                print("Provided path is not absolute, converting to absolute path")
+                args.path = os.path.join(os.getcwd(), args.path)
+            else:
+                print("Provided path is absolute, using as is.")
+            
+        print("Using %s" % args.path)
             
         results = search(args.searchTerm)
         

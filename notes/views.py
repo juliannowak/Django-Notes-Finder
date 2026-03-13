@@ -8,6 +8,7 @@ import mingus.extra.lilypond as LilyPond
 from . import models
 import crawlMidiWorld as mw
 import crawlBitMidi as bm
+import crawlFreeMidi as fm
 import os
 
 SEARCH_SITES = ['MidiWorld']
@@ -49,7 +50,7 @@ def create_search(search_term: str):
     if search is None:
         dictMidi = mw.search(search_term)
         #dictBitMidi = bm.search(search_term)
-        #print(dictMidi.keys())
+        print(dictMidi.keys())
         search = models.Search.objects.create(search_term=search_term, dictMidi=dictMidi)
         #TODO create_result(site_name)
         try:
@@ -112,5 +113,16 @@ def midi(request, midi_name):
     #models.MidiResult.objects.filter(midi_name)
     return render(request, 'midi.html', {'midi_name': midi_name})
 
-def notes(request):
+def notes(request, midi_name):
+    midi = models.MidiResult.objects.filter(midi_name)
+    notes = models.Notes.objects.filter(midi)
+    return render(request, 'notes.html', {'notes': notes})
+
+def notes_by_tracks(request, midi_name, track):
+    pass
+
+def notes_by_transposition(request, midi_name, transposition):
+    pass
+    
+def notes_by_both(request, midi_name, track, transposition):
     pass

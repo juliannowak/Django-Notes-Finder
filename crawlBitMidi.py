@@ -1,4 +1,7 @@
 from requests_html import HTMLSession, AsyncHTMLSession
+import datetime
+import os
+import argparse
 
 session = HTMLSession()
 
@@ -26,13 +29,95 @@ def search(search: str = '') -> dict[str, str]:
         
     return lists2dict(songs,links)
     
-def scrape(data: dict):
-    for song in data.keys():
-        midi = session.get('https://bitmidi.com/' + data[song], stream = True) 
-        with open(song + '.mid', 'wb') as file:
+def scrape(data: dict, path: str = ''):
+    for key, value in data.items():
+        midi = session.get('https://bitmidi.com/' + value, stream = True) 
+
+        if path != '':
+            fileName = os.path.join(path, key)
+        else:
+            fileName = key
+        print("Saving %s" % fileName)
+
+        with open(fileName + '.mid', 'wb') as file:
             for chunk in midi.iter_content(chunk_size=1024):
                 # writing one chunk at a time
                 if chunk: 
                     file.write(chunk) 
 
-print(search('kesha'))
+if __name__ == "__main__":
+    print("running directly")
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Scrapes Bit Midi',
+                                    prog='crawlBitMidi',
+                                    epilog='\nthank you')
+    parser.add_argument('searchTerm',
+                        help="a string to search for results with\nif it has spaces, enclose it with double quotes",)       #required
+    parser.add_argument('-q', '--query',    #optionals
+                        help="outputs the resulting titles and links to the console, in JSON form",
+                        action='store_true')
+    parser.add_argument('-d', '--download',
+                        help="downloads the results, .mid",
+                        action='store_true')
+    parser.add_argument('-j', '--json',
+                        help="downloads the resulting titles and links, .json",        
+                        action='store_true')
+    parser.add_argument('-c', '--csv',
+                        help="downloads the results, .csv",         
+                    action='store_true')
+    parser.add_argument('-v', '--verbose',
+                        help="outputs additional info, only useful in debugging",
+                        action='store_true')
+    parser.add_argument('-p', '--path',
+                        help="a path to save downloads to",)
+    
+    
+    # parser.add_argument('integers', metavar='N', type=int, nargs='+',
+    #                     help='an integer for the accumulator') #list of integer args
+    # parser.add_argument('--sum', dest='accumulate', action='store_const',
+    #                     const=sum, default=max,
+    #                     help='sum the integers (default: find the max)') #boolean flag like function holder
+    
+    args = parser.parse_args()
+    #print(args.accumulate(args.integers))
+    
+    if args.searchTerm != None:
+        if args.verbose:
+            print(args.searchTerm)
+        
+        if args.path == None:
+            print("No path provided, saving to FreeMidi folder in current directory")
+            args.path = os.path.join(os.getcwd(), "FreeMidi")
+            if not os.path.exists(args.path):
+                os.makedirs(args.path)
+        else:
+            if not os.path.isabs(args.path):
+                print("Provided path is not absolute, converting to absolute path")
+                args.path = os.path.join(os.getcwd(), args.path)
+            else:
+                print("Provided path is absolute, using as is.")
+            
+        print("Using %s" % args.path)
+            
+        results = search(args.searchTerm)
+        
+        if args.query is True:
+            print(results)
+            
+            if args.download is True:
+                import json
+                
+                jsonQuery = json.dumps(results)
+                currentTime = datetime.now()
+                
+                name = os.path.join(args.path, args.searchTerm + currentTime)
+                with open(name, 'wb') as f:
+                    f.write(jsonQuery)
+            
+        if args.download is True:
+            scrape(results)            
+else:
+    print("running from import")
+
+#print(search('kesha'))

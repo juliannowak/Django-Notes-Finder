@@ -34,3 +34,4 @@ class Notes(models.Model):
 
     def __str__(self):
         return f'Transposition:{str(self.transposition/2 or 0)}\nTrack:{self.midi_track}'
+        #defaults to 0,0 for entire track, no transposition

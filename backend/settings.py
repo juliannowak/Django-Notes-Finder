@@ -37,7 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'notes'
+    'notes',
+    'django_bootstrap5',
+    'sass_processor',
 ]
 
 MIDDLEWARE = [
@@ -124,3 +126,19 @@ MEDIA_ROOT = BASE_DIR / 'media/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+#settings for SASS Processor
+SASS_PROCESSOR_ENABLED = True
+
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'static/'
+STATICFILES_DIRS = [
+   (BASE_DIR / 'staticfiles/')
+]
+
+SASS_PROCESSOR_ROOT = BASE_DIR / 'static/'
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+    'sass_processor.finders.CssFinder',
+]
