@@ -3,7 +3,7 @@ from . import views
 
 urlpatterns = [
     #path('donate', views.donate, name='donate'),
-    path('search', views.search, name='search'),
+    path('search/', views.search, name='search'),
     path('search/<str:search_term>/', views.result, name='results'),
     path('midi/<str:midi_name>/', views.midi, name='midi'), #midi, all tracks, no transpositions (can easily be done in preffered DAW)
     path('notes/<str:midi_name>/', views.notes, name='notes'), # all tracks, or the entire sheet music composistion

@@ -2,6 +2,24 @@
   {% for name, midi in results %}
     <h4>{{name}}</h4><br/>
     <a style="display: block; text-indent: 50px;" href="{{midi}}">{{midi}}</a>
+    <!-- <p>Number of tracks: {{count_tracks}}</p> and a check box for each -->
+    <p>Transposition:</p>
+    <select name="transposition">
+      <option value="0">C</option>
+      <option value="1">C#</option>
+      <option value="2">D</option>
+      <option value="3">D#</option>
+      <option value="4">E</option>
+      <option value="5">F</option>
+      <option value="6">F#</option>
+      <option value="7">G</option>
+      <option value="8">G#</option>
+      <option value="9">A</option>
+      <option value="10">A#</option>
+      <option value="11">B</option>
+    </select>
+    <input type="button" value="Download Tracks Together (Conductor's Score)">
+    <input type="button" value="Download Tracks Separately">
   {% endfor %}
 {% else %}
   <p>No midis found.</p>
