@@ -1,5 +1,5 @@
 {% if results %}
-  {% for name, midi in results %}
+  {% for name, midi, transposition in results %}
     <h4>{{name}}</h4><br/>
     <a style="display: block; text-indent: 50px;" href="{{midi}}">{{midi}}</a>
     <!-- <p>Number of tracks: {{count_tracks}}</p> and a check box for each -->

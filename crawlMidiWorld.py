@@ -55,9 +55,15 @@ def scrape(data: dict, path=''):
             fileName = os.path.join(path, song)
         else:
             fileName = song
-        print("Saving %s" % fileName)
+        
+        # Check if the file already exists
+        fileName = os.path.join(path, song) if path else song
+        if os.path.exists(fileName + '.mid'):
+            print(f"File {fileName + '.mid'} already exists, skipping download.")
+            continue
         
         with open(fileName + '.mid', 'wb') as file:
+            print("Saving %s" % fileName)
             for chunk in midi.iter_content(chunk_size=1024):
                 # writing one chunk at a time
                 if chunk: 
@@ -105,8 +111,8 @@ if __name__ == "__main__":
             print(args.searchTerm)
         
         if args.path == None:
-            print("No path provided, saving to FreeMidi folder in current directory")
-            args.path = os.path.join(os.getcwd(), "FreeMidi")
+            print("No path provided, saving to MidiWorld folder in current directory")
+            args.path = os.path.join(os.getcwd(), "MidiWorld")
             if not os.path.exists(args.path):
                 os.makedirs(args.path)
         else:
@@ -134,7 +140,7 @@ if __name__ == "__main__":
                     f.write(jsonQuery)
             
         if args.download is True:
-            scrape(results)            
+            scrape(results, args.path)            
 else:
     print("running from import")
 #scrape(search('blink 182'))

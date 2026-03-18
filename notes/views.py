@@ -1,14 +1,15 @@
-from django.shortcuts import render, redirect
-from django.http import HttpResponse
-from django import forms
-from django.conf import settings
 from mingus.containers import Bar, NoteContainer, Track, Composition
 import mingus.midi.midi_file_in as MidiIn
 import mingus.extra.lilypond as LilyPond
-from . import models
 import crawlMidiWorld as mw
 import crawlBitMidi as bm
 import crawlFreeMidi as fm
+from django.shortcuts import render, redirect
+from django.http import HttpResponse
+from django.conf import settings
+from django import forms
+from . import models
+import mido
 import os
 
 SEARCH_SITES = ['MidiWorld']
@@ -21,33 +22,52 @@ def trackToComposition(track):
     out_comp.add_track(out_track)
     return out_comp
 
-def make_notes(midi_path: str, site: str):
+def make_notes(midi_path: str, keys: str, tracks: str):
     try:
+        # Mido's parser is more lenient with SMF specifications
+        mid = mido.MidiFile(midi_path)
+        
+        # Saving it via mido reconstructs a standard header and message structure
+        mid.save(midi_path)
         compIn, compInBPM = MidiIn.MIDI_to_Composition(midi_path)
-    except:
-        print("error")
-    
-    # track = compIn.tracks[1]
-    # print(len(track.bars))
-    # numBars = len(track.bars)  # count
 
-    notes = []
-    for i, track in enumerate(compIn.tracks):
-        if i == 2:
-            break
-        filename = os.path.basename(midi_path)
-        filename = os.path.splitext(filename)[0]
-        pdf_path = os.path.join(settings.MEDIA_ROOT, 'Midi World', f"{filename}{i}")
-        LilyPond.to_pdf(LilyPond.from_Composition(trackToComposition(track)),
-                        pdf_path)
-        notes += pdf_path
-        return notes
-        # LilyPond.to_pdf(LilyPond.from_Composition(out_comp),os.path.join(settings.MEDIA_ROOT, 'Midi World', f"{filename} all tracks")
 
-    return len(compIn.tracks)
+        # track = compIn.tracks[1]
+        # print(len(track.bars))
+        # numBars = len(track.bars)  # count
+
+        #save entire composition for each key
+        filename = os.path.splitext(os.path.basename(midi_path))[0]
+        #filename = os.path.splitext(filename)[0]
+        key='C' #temporary
+        pdf_path = os.path.join(settings.MEDIA_ROOT,  filename, "pdf", key, f"FullScore.pdf" )
+        png_path = os.path.join(settings.MEDIA_ROOT,  filename, "png", key, f"FullScore.png" )
+        
+        #save individual tracks
+        notes = [] #paths to pdfs and pngs for each track
+        for i, track in enumerate(compIn.tracks):
+            if i == 2:
+                break
+            
+            pdf_path = os.path.join(settings.MEDIA_ROOT,  filename, "pdf", key, f"Track {i}.pdf" )
+            png_path = os.path.join(settings.MEDIA_ROOT,  filename, "png", key, f"Track {i}.png" )
+            LilyPond.to_pdf(LilyPond.from_Composition(trackToComposition(track)),
+                            pdf_path)
+            LilyPond.to_png(LilyPond.from_Composition(trackToComposition(track)),
+                            png_path)
+            
+            notes += pdf_path
+            #notes += png_path
+
+        print(f"Parsed {midi_path} successfully")
+        #return notes
+        return len(compIn.tracks)
+    except Exception as e:
+        print(f"Error parsing midi file {midi_path}: {e}")
 
 def create_result(site_name):
     pass
+
 #TODO rewrite as crawler object with list comps
 def create_search(search_term: str):
     search = models.Search.objects.filter(search_term=search_term).first()
@@ -79,7 +99,7 @@ def create_search(search_term: str):
             midi = os.path.join(settings.MEDIA_ROOT, 'Midi World', fileName)
             models.Midi.objects.create(midi_name=fileName, file_midi=midi, results=search)
 
-            # make_notes(midi)
+            #count_tracks = make_notes(midi, 'C', '0') #TODO change to actual keys and tracks
             #TODO thread: models.SheetMusic.objects.create()
 
 #FORMS
@@ -98,7 +118,9 @@ def result(request, search_term):
     results = results['dictMidi']
     count_tracks = []
     for result in results.keys():
-        count_tracks.append(make_notes(result + '.mid', 'dictMidi'))
+        midi_path = os.path.join(settings.MEDIA_ROOT, 'Midi World', result + '.mid')
+        print(midi_path)
+        count_tracks.append(make_notes(midi_path, 'C', '0')) #TODO change to actual keys and tracks
     results = zip(results.keys(), results.values(), count_tracks) #TODO change to dict with midi name, link, and number of tracks   
 
     if results == None:

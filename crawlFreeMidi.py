@@ -3,6 +3,32 @@ from datetime import datetime
 import argparse
 from requests_html import HTMLSession, AsyncHTMLSession
 session = HTMLSession()
+asession = AsyncHTMLSession()
+
+# Temporary fix for pyppeteer, replace this path with the actual path to your chrome.exe
+# also have to set below variable in your CONDA_PATH\envs\YourEnv\Lib\site-packages\pyppeteer\__init__.py
+# __chromium_revision__ = '1263111'
+os.environ['PYPPETEER_EXECUTABLE_PATH'] = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+
+async def get_midi_link(url):
+    # Use await for the network request
+    midi_page = await asession.get(url)
+    
+    # Use await with .arender() (the async version of .render)
+    await midi_page.html.arender(sleep=1)
+    
+    # Find the element as usual
+    link = midi_page.html.find('a#downloadmidi', first=True)
+    return link.attrs['href'] if link else None
+
+    #USE
+    # To run a single URL:
+    # result = asession.run(lambda: get_midi_link('https://example.com'))
+    # print(result)
+
+    # # To run multiple URLs concurrently (this is why await is powerful):
+    # urls = ['url1', 'url2', 'url3']
+    # results = asession.run(*[lambda u=url: get_midi_link(u) for u in urls])
 
 def search(search: str = '') -> dict[str, str]:
     search = search.replace(' ', '+')
@@ -45,19 +71,30 @@ def scrape(data, path=''):
         print(f"Processing {key} with link {value}...")
         midi_page = session.get('https://www.freemidi.org/' + value)
         #midi_page.html.render()
+        midi_page.html.render(sleep=1) # sleep gives JS time to finish loading
         midi_link = midi_page.html.find('a#downloadmidi', first=True)
-        midi_link = 'https://www.freemidi.org/' + midi_link.attrs.get('href', '')
-        print(f"Downloading {key} from {midi_link}...")
         if midi_link is None:
-            print(f"Could not find MIDI link for {key}, skipping.")
+            print(f"Could not find MIDI link for {key}, skipping. Link tried: https://www.freemidi.org/{value}")
             continue
+        midi_link = 'https://www.freemidi.org/' + midi_link.attrs.get('href', '')
+        
+        print(f"Downloading {key} from {midi_link}...")
         midi = session.get(midi_link, stream = True) 
     
+        #sanitze path variable, for slashes especially
+        from pathvalidate import sanitize_filepath
+        path = sanitize_filepath(path)
         if path != '':
             fileName = os.path.join(path, key)
         else:
             fileName = key
         print("Saving %s" % fileName)
+
+        # Check if the file already exists
+        fileName = os.path.join(path, key) if path else key
+        if os.path.exists(fileName + '.mid'):
+            print(f"File {fileName + '.mid'} already exists, skipping download.")
+            continue
         
         with open(fileName + '.mid', 'wb') as file:
             for chunk in midi.iter_content(chunk_size=1024):
