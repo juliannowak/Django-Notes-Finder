@@ -6,7 +6,7 @@ requirements: lilypond installed and added to $PATH or to the environment variab
 """
 import glob
 from tkinter import NO
-
+DEBUG = True
 from matplotlib.pyplot import bar
 import mido
 import mingus
@@ -121,32 +121,45 @@ def write_composition(comp, filename, tracks_to_skip=None):
         }
     }
 """
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    output_dir = os.path.dirname(filename)
+    if DEBUG:
+        print("Track count:", len(comp.tracks))
+    
     for i, track in enumerate(comp.tracks):
-            if len(track.bars) > 0:
+        if DEBUG:
+            print(id, "bars:", len(track.bars))
+
+        if len(track.bars) > 0:
+            if DEBUG:
                 current_meter = track.bars[0].meter
                 print(f"The meter is: {current_meter}")
-
+        else:
+            print("track is empty or unknown meter")
             # Default to 4/4 if no meter is set
             # if track.meter is None:
             #     track.meter = (4, 4)
             # else:
             #     print(f"Track {i} has meter: {track.meter}")
 
-            for bar in track.bars:
-                if not bar.is_full():
+        for bar in track.bars:
+            if not bar.is_full():
+                if DEBUG:
                     print(f"Bar {i} is underfull: {bar.current_beat}")
-                    bar.place_rest(bar.space_left())
-                # Check if mingus allowed it to go over (rare but possible with some methods)
-                if bar.current_beat > bar.meter[0]: 
+                bar.place_rest(bar.space_left())
+            # Check if mingus allowed it to go over (rare but possible with some methods)
+            if bar.current_beat > bar.meter[0]:
+                if DEBUG: 
                     print(f"Bar {i} is OVERFULL! This is killing your breaks.")
+    
+        # if i in tracks_to_skip:
+        #     continue
         
-            # if i in tracks_to_skip:
-            #     continue
-            
-            ly_str = break_on_single_bar(
-                    break_on_double_bar(
-                    LilyPond.from_Composition(trackToComposition(track))))
-            LilyPond.to_png(header + ly_str, f"{filename}_track{i}")
+        ly_str = break_on_single_bar(
+                break_on_double_bar(
+                LilyPond.from_Composition(trackToComposition(track))))
+        out_base = os.path.join(output_dir, f"{stem}_track{i}")
+        LilyPond.to_png(header + ly_str, out_base)
             
 def mido_parse(file):
     try:
@@ -263,12 +276,11 @@ def process(path=None):
             except Exception as e:
                 print(f"error parsing midi file: {e}")
 
-            #convert midi to sheet music png
+            #convert midi to composition object compIn
             compIn, compInBPM = MidiIn.MIDI_to_Composition(file)
             
             #Roxanne: [0, 6]
             write_composition(compIn, file) 
-            print("number of track in composition: %s" % len(compIn.tracks))
     else:
         print("You need to pass in a path to the files you want to process for libMido to work.")
 
