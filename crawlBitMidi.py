@@ -3,7 +3,18 @@ import datetime
 import os
 import argparse
 
-session = HTMLSession()
+def find_first_match(substring, string_list):
+    """
+    Returns the first string in string_list that contains the substring.
+
+    Args:
+        substring: The substring to search for.
+        string_list: A list of strings.
+
+    Returns:
+        The first matching string, or None if no match is found.
+    """
+    return next((s for s in string_list if substring in s), None)
 
 def lists2dict(keyList, valueList):
     #print("# of keys: {}\n# of values: {}\nkeys: {}\nvalues: {}".format(len(keyList), len(valueList), keyList, valueList))
@@ -31,29 +42,48 @@ def search(search: str = '') -> dict[str, str]:
     
 def scrape(data: dict, path: str = ''):
     for key, value in data.items():
-        midi = session.get('https://bitmidi.com/' + value, stream = True) 
+        print(f"Processing {key} from {value}")
+        midi_page = session.get('https://bitmidi.com' + value)
+        #midi_page.html.render(sleep=5)  # Render JavaScript to get the download link
+        anchor_tags =midi_page.html.find(selector='a.dark-blue')
+        #print(f"First few anchor tags: {anchor_tags}")  # Print the first few anchor tags for debugging
+        #print(f"Found {len(anchor_tags)} anchor tags on the page.")
+        midi_download = [a.attrs.get('href') for a in anchor_tags if '.mid' in str(a.attrs.get('href'))]
+        print(midi_download)
+        
+        midi_link = find_first_match('uploads', midi_download)
+        print(f"Found MIDI link: {midi_link}")
+        midi = session.get('https://bitmidi.com/' + midi_link, stream=True)
 
+        # refactor into: fileName = os.path.join(path, song) if path else key
         if path != '':
             fileName = os.path.join(path, key)
         else:
             fileName = key
 
-                # Check if the file already exists
-        fileName = os.path.join(path, key) if path else key
-        if os.path.exists(fileName + '.mid'):
-            print(f"File {fileName + '.mid'} already exists, skipping download.")
-            continue
+        full_name = fileName + '.mid'
 
-        with open(fileName + '.mid', 'wb') as file:
-            print("Saving %s" % fileName)
-            for chunk in midi.iter_content(chunk_size=1024):
-                # writing one chunk at a time
-                if chunk: 
-                    file.write(chunk) 
+        # Check if we should skip
+        if os.path.exists(full_name) and os.path.getsize(full_name) > 0:
+            print(f"Skipping {full_name}, already exists.")
+        else:
+            # Check if the request actually succeeded
+            if midi.status_code == 200:
+                with open(full_name, 'wb') as file:
+                    print(f"Saving {fileName}...")
+                    for chunk in midi.iter_content(chunk_size=1024):
+                        # writing one chunk at a time
+                        if chunk: 
+                            file.write(chunk)
+            else:
+                print(f"Failed to download {fileName}. Status: {midi.status_code}")
 
 if __name__ == "__main__":
     print("running directly")
-    import argparse
+    session = HTMLSession()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    })
     
     parser = argparse.ArgumentParser(description='Scrapes Bit Midi',
                                     prog='crawlBitMidi',
@@ -125,5 +155,9 @@ if __name__ == "__main__":
             scrape(results, args.path)            
 else:
     print("running from import")
+    session = HTMLSession()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    })
 
 #print(search('kesha'))

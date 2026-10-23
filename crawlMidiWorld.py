@@ -1,7 +1,7 @@
 import os
+import argparse
 from datetime import datetime
 from requests_html import HTMLSession, AsyncHTMLSession
-session = HTMLSession()
 
 def download_file(url, local_filename):
     # NOTE the stream=True parameter below
@@ -49,29 +49,36 @@ def scrape(data: dict, path=''):
     for song in data.keys():
         midi = session.get(data[song], stream = True) 
         
+        # refactor into: fileName = os.path.join(path, song) if path else song
         fileName = song
-        
         if path != '':
             fileName = os.path.join(path, song)
         else:
             fileName = song
         
-        # Check if the file already exists
-        fileName = os.path.join(path, song) if path else song
-        if os.path.exists(fileName + '.mid'):
-            print(f"File {fileName + '.mid'} already exists, skipping download.")
-            continue
-        
-        with open(fileName + '.mid', 'wb') as file:
-            print("Saving %s" % fileName)
-            for chunk in midi.iter_content(chunk_size=1024):
-                # writing one chunk at a time
-                if chunk: 
-                    file.write(chunk) 
+        full_name = fileName + '.mid'
+
+        # Check if we should skip
+        if os.path.exists(full_name) and os.path.getsize(full_name) > 0:
+            print(f"Skipping {full_name}, already exists.")
+        else:
+            # Check if the request actually succeeded
+            if midi.status_code == 200:
+                with open(full_name, 'wb') as file:
+                    print(f"Saving {fileName}...")
+                    for chunk in midi.iter_content(chunk_size=1024):
+                        # writing one chunk at a time
+                        if chunk: 
+                            file.write(chunk)
+            else:
+                print(f"Failed to download {fileName}. Status: {midi.status_code}")
 
 if __name__ == "__main__":
+    session = HTMLSession()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    })
     print("running directly")
-    import argparse
     
     parser = argparse.ArgumentParser(description='Scrapes Midi World',
                                     prog='crawlMidiWorld',
@@ -142,5 +149,10 @@ if __name__ == "__main__":
         if args.download is True:
             scrape(results, args.path)            
 else:
+    session = HTMLSession()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    })
+
     print("running from import")
 #scrape(search('blink 182'))

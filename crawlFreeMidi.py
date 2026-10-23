@@ -1,15 +1,17 @@
 import os
 from datetime import datetime
 import argparse
+import time
 from requests_html import HTMLSession, AsyncHTMLSession
-session = HTMLSession()
-asession = AsyncHTMLSession()
+
+#TODO async version not working
 
 # Temporary fix for pyppeteer, replace this path with the actual path to your chrome.exe
 # also have to set below variable in your CONDA_PATH\envs\YourEnv\Lib\site-packages\pyppeteer\__init__.py
 # __chromium_revision__ = '1263111'
 os.environ['PYPPETEER_EXECUTABLE_PATH'] = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
 
+#NOTE: unused
 async def get_midi_link(url):
     # Use await for the network request
     midi_page = await asession.get(url)
@@ -21,7 +23,7 @@ async def get_midi_link(url):
     link = midi_page.html.find('a#downloadmidi', first=True)
     return link.attrs['href'] if link else None
 
-    #USE
+    # ASYNC
     # To run a single URL:
     # result = asession.run(lambda: get_midi_link('https://example.com'))
     # print(result)
@@ -64,7 +66,6 @@ def search(search: str = '') -> dict[str, str]:
     #exit()
     return results
 
-
 #TODO problem; it is getting links from categories, not just songs
 def scrape(data, path=''):
     for key, value in data.items():
@@ -79,31 +80,45 @@ def scrape(data, path=''):
         midi_link = 'https://www.freemidi.org/' + midi_link.attrs.get('href', '')
         
         print(f"Downloading {key} from {midi_link}...")
-        midi = session.get(midi_link, stream = True) 
+        time.sleep(1) # be nice to the server and avoid rapid-fire requests
+        midi = session.get(midi_link, stream=True) 
     
         #sanitze path variable, for slashes especially
         from pathvalidate import sanitize_filepath
+        print(f"Key: {key}")
         path = sanitize_filepath(path)
         if path != '':
             fileName = os.path.join(path, key)
         else:
             fileName = key
-        print("Saving %s" % fileName)
 
-        # Check if the file already exists
-        fileName = os.path.join(path, key) if path else key
-        if os.path.exists(fileName + '.mid'):
-            print(f"File {fileName + '.mid'} already exists, skipping download.")
-            continue
-        
-        with open(fileName + '.mid', 'wb') as file:
-            for chunk in midi.iter_content(chunk_size=1024):
-                # writing one chunk at a time
-                if chunk: 
-                    file.write(chunk)
+
+        full_name = fileName + '.mid'
+
+        # Check if we should skip
+        if os.path.exists(full_name) and os.path.getsize(full_name) > 0:
+            print(f"Skipping {full_name}, already exists.")
+        else:
+            # Check if the request actually succeeded
+            if midi.status_code == 200:
+                with open(full_name, 'wb') as file:
+                    print(f"Saving {fileName}...")
+                    for chunk in midi.iter_content(chunk_size=1024):
+                        # writing one chunk at a time
+                        if chunk: 
+                            file.write(chunk)
+            else:
+                print(f"Failed to download {fileName}. Status: {midi.status_code}")
 
 #TODO fix path variable, it is not working as intended, it is saving to the current directory instead of the provided path
 if __name__ == "__main__":
+    session = HTMLSession()
+    #asession = AsyncHTMLSession()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Referer': 'https://bitmidi.com'
+    })
+
     parser = argparse.ArgumentParser(description='Scrapes Free Midi',
                                     prog='crawlFreeMidi',
                                     epilog='\nthank you')
@@ -165,6 +180,12 @@ if __name__ == "__main__":
         if args.download is True:
             scrape(results, args.path)            
 else:
+    session = HTMLSession()
+    #asession = AsyncHTMLSession()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Referer': 'https://bitmidi.com'
+    })
     print("running from import")
     
 #scrape(search("american"))

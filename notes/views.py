@@ -1,3 +1,6 @@
+import site
+
+from django.conf.locale import it
 from mingus.containers import Bar, NoteContainer, Track, Composition
 import mingus.midi.midi_file_in as MidiIn
 import mingus.extra.lilypond as LilyPond
@@ -11,8 +14,9 @@ from django import forms
 from . import models
 import mido
 import os
+from urllib.parse import urlparse
 
-SEARCH_SITES = ['MidiWorld']
+SEARCH_SITES = [mw,] #bm, fm] #TODO add more sites, and create an enum
 
 def trackToComposition(track):
     out_comp = Composition()
@@ -70,38 +74,52 @@ def create_result(site_name):
 
 #TODO rewrite as crawler object with list comps
 def create_search(search_term: str):
-    search = models.Search.objects.filter(search_term=search_term).first()
-    if search is None:
-        #note dictMidi = search results
-        dictMidi = mw.search(search_term) #get search results from crawler, TODO thread and add to db as they are found instead of waiting for all results to be found before adding to db
-        #dictBitMidi = bm.search(search_term)
-        print(dictMidi.keys())
-        search = models.Search.objects.create(search_term=search_term, dictMidi=dictMidi) #add results to db
+    results = models.Search.objects.filter(search_term=search_term).first()
+    if results is None:
+        for site in SEARCH_SITES:
+            mod = site #TODO refactor site into module and site_name, getting rid of site variable entirely
+            site_name = site.__name__[5:] #TODO add spaces between capitals
+            search = getattr(site, "search", None)
+    
+            if search:
+                print(f"{site.__name__} found:", search(search_term).keys())
+                dictMidi = site.search(search_term)
+                results = models.Search.objects.create(search_term=search_term, dictMidi=dictMidi) #add result to db
+                
+                #move this to run on server initialization.
+                try:
+                    os.makedirs(os.path.join(settings.MEDIA_ROOT, site_name))
+                    # os.makedirs(os.path.join(settings.MEDIA_ROOT, 'bm'))
+                    # os.makedirs(os.path.join(settings.MEDIA_ROOT, 'fm'))
+                except FileExistsError:
+                    pass
 
-        #move this to run on server initialization.
-        try:
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, 'Midi World'))
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, 'Bit Midi'))
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, 'Free Midi'))
-        except FileExistsError:
-            pass
-
-        #use search results download midi files, TODO thread and upload into folders by site name,
-        mw.scrape(dictMidi, os.path.join(settings.MEDIA_ROOT, 'Midi World'))
-        #bm.scrape(dictBitMidi, os.path.join(settings.MEDIA_ROOT, 'Bit Midi'))
-        #fm.scrape(dictFreeMidi, os.path.join(settings.MEDIA_ROOT, 'Free Midi'))
+                #use search results to download midi files
+                scrape = getattr(site, "scrape", None)
+                if scrape:
+                    site.scrape(dictMidi, os.path.join(settings.MEDIA_ROOT, site_name))
+                    print(f"Scraped {site_name} successfully")
+                else:
+                    print(f"{site_name} does not have a scrape function.")
+                #bm.scrape(dictBitMidi, os.path.join(settings.MEDIA_ROOT, 'BitMidi'))
+                #fm.scrape(dictFreeMidi, os.path.join(settings.MEDIA_ROOT, 'FreeMidi'))
+                
+                #use search results to add midi results and sheet music results to db
+                # TODO thread and upload sheet music into folders by file name, track numbers, transposition
+                for key, value in dictMidi.items():
+                    fileName = key + '.mid'
+                    print(fileName)
+                    midi = os.path.join(settings.MEDIA_ROOT, site_name, fileName)
+                    models.Midi.objects.create(name=fileName, file=midi, results=results, site=site_name)
+                    print(f"Created new Midi object from {fileName}")
+                    #TODO decide whether site field should be the name or module
+                    
+                    #count_tracks = make_notes(midi, 'C', '0') #TODO change to actual keys and tracks
+                    #TODO thread: models.Sheet.objects.create()
+                    
+            else:
+                print(f"{site.__name__} does not have a search function.")
         
-        #use search results to add midi results and sheet music results to db
-        # TODO thread and upload sheet music into folders by file name, track numbers, transposition
-        for key, value in dictMidi.items():
-            fileName = key + '.mid'
-            print(fileName)
-            midi = os.path.join(settings.MEDIA_ROOT, 'Midi World', fileName)
-            models.Midi.objects.create(midi_name=fileName, file_midi=midi, results=search)
-
-            #count_tracks = make_notes(midi, 'C', '0') #TODO change to actual keys and tracks
-            #TODO thread: models.SheetMusic.objects.create()
-
 #FORMS
 class SearchForm(forms.ModelForm):
     class Meta:
@@ -113,20 +131,42 @@ class SearchForm(forms.ModelForm):
 
 #VIEWS
 def result(request, search_term):
-    #get the results from a site
-    results = models.Search.objects.filter(search_term=search_term).values('dictMidi').first()
-    results = results['dictMidi']
-    count_tracks = []
-    for result in results.keys():
-        midi_path = os.path.join(settings.MEDIA_ROOT, 'Midi World', result + '.mid')
-        print(midi_path)
-        count_tracks.append(make_notes(midi_path, 'C', '0')) #TODO change to actual keys and tracks
-    results = zip(results.keys(), results.values(), count_tracks) #TODO change to dict with midi name, link, and number of tracks   
+    #TODO FIX
+    search_result = models.Search.objects.filter(search_term=search_term).first()
+    if search_result is None:
+        return HttpResponse("Not Found")
 
-    if results == None:
-        return HttpResponse("not found")
+    # results is a foreign key on Midi, so values() returns its integer ID
+    midi_result = models.Midi.objects.filter(results=search_result).first()
+    if midi_result is not None:
+        site = midi_result.site
+        results = search_result.dictMidi
+        print(f"Results for {search_term} on {site}: {results}")
+            
+        midi_paths = [] #my urls
+        site_urls = []
+        for name, url in results.items():
+            site_urls.append(url)
+            path = os.path.join(settings.MEDIA_ROOT, site, name + '.mid')
+            #print(path)
+            midi_paths.append(path)
+        results = list(zip(results.keys(), midi_paths, [site], site_urls))
+        print(results[0])
     else:
-        return render(request, "results.html", {'results': results})
+        return HttpResponse("Not Found")
+
+    return render(request, 'results.html', { 'midi_results': results})
+
+    
+    
+    
+    #create transpositsons
+    # count_tracks = []
+    # for result in results.keys():
+    #     midi_path = os.path.join(settings.MEDIA_ROOT, 'Midi World', result + '.mid')
+    #     print(midi_path)
+    #     count_tracks.append(make_notes(midi_path, 'C', '0')) #TODO change to actual keys and tracks
+    # results = zip(results.keys(), results.values(), count_tracks) #TODO change to dict with midi name, link, and number of tracks   
     
 def search(request):
     #handle form action (search)

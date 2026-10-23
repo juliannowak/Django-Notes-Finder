@@ -1,26 +1,14 @@
-{% if results %}
-  {% for name, midi, transposition in results %}
-    <h4>{{name}}</h4><br/>
-    <a style="display: block; text-indent: 50px;" href="{{midi}}">{{midi}}</a>
-    <!-- <p>Number of tracks: {{count_tracks}}</p> and a check box for each -->
-    <p>Transposition:</p>
-    <select name="transposition">
-      <option value="0">C</option>
-      <option value="1">C#</option>
-      <option value="2">D</option>
-      <option value="3">D#</option>
-      <option value="4">E</option>
-      <option value="5">F</option>
-      <option value="6">F#</option>
-      <option value="7">G</option>
-      <option value="8">G#</option>
-      <option value="9">A</option>
-      <option value="10">A#</option>
-      <option value="11">B</option>
-    </select>
-    <input type="button" value="Download Tracks Together (Conductor's Score)">
-    <input type="button" value="Download Tracks Separately">
+{% if midi_results %}
+  {% for name, url, site, source_url in midi_results %}
+  <h1>Result #</h1>
+    <h4><a style="display: block; text-indent: 50px;">{{name}}</a></h4><br/>
+    <input type="button" value="Midi" href="{% url 'midi' midi_name=name %}">
+    <input type="button" value="Sheet Music">
+    <br>
+    <a href="{{source_url}}" download>Download source from {{site}}</a>
   {% endfor %}
+  <br>
+  <h4>more results</h4>
 {% else %}
-  <p>No midis found.</p>
+  <p>No results found.</p>
 {% endif %}

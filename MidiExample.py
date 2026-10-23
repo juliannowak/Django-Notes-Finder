@@ -15,9 +15,8 @@ def scale():
 	MyMIDI.addTempo(track,time, tempo)
 	
 	for pitch in degrees:
-	    MyMIDI.addNote(track, channel, pitch, time, duration, volume)
-	    time = time + 1
+		MyMIDI.addNote(track, channel, pitch, time, duration, volume)
+		time = time + 1
 	
 	with open("major-scale.mid", "wb") as output_file:
 	    MyMIDI.writeFile(output_file)
-
