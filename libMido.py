@@ -8,7 +8,6 @@ import glob
 from tkinter import NO
 DEBUG = True
 from matplotlib.pyplot import bar
-import mido
 import mingus
 import mingus.midi.midi_file_in as MidiIn
 import mingus.extra.lilypond as LilyPond
@@ -128,7 +127,7 @@ def write_composition(comp, filename, tracks_to_skip=None):
     
     for i, track in enumerate(comp.tracks):
         if DEBUG:
-            print(id, "bars:", len(track.bars))
+            print(i, "bars:", len(track.bars))
 
         if len(track.bars) > 0:
             if DEBUG:
@@ -267,7 +266,7 @@ def process(path=None):
         for file in glob.glob(path):
             try:
                 music21_parse(file, file)  # Parse and overwrite the same file
-                mido_parse(file)  # Re-parse with mido to ensure it's well-formed
+                #mido_parse(file)  # AVOID FOR NOW. Re-parse with mido to ensure it's well-formed
                 #force_clean_syx(file, file)  # Clean and re-save as binary MIDI/SYX
                 #nuclear_hex_cleaner(file, file)  # Aggressively clean hex and save as binary
                 print(f"Parsed {file} successfully")
