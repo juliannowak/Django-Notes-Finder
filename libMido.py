@@ -93,7 +93,7 @@ def fix_overfull_bars(track):
             # for track in your_composition.tracks:
             #     fix_overfull_bars(track)
 
-def write_composition(comp, filename, tracks_to_skip=None):
+def write_composition_old(comp, filename, tracks_to_skip=None):
     header = r"""
     \version "2.24.4"
     #(set-global-staff-size 14)
@@ -159,7 +159,51 @@ def write_composition(comp, filename, tracks_to_skip=None):
                 LilyPond.from_Composition(trackToComposition(track))))
         out_base = os.path.join(output_dir, f"{stem}_track{i}")
         LilyPond.to_png(header + ly_str, out_base)
-            
+
+def write_composition(comp, base_path):
+    header = r"""
+        \version "2.24.4"
+        #(set-global-staff-size 14)
+        #(ly:set-option 'crop #t)
+        #(set-paper-size "a4")    % Set the physical page size
+        \paper {
+            top-margin = 10\mm        % Adjust margins to prevent clipping
+            bottom-margin = 10\mm
+            left-margin = 15\mm
+            line-width = 180\mm       % Must match the layout's expectations
+        }
+    
+        \layout {
+            ragged-right = ##f
+            \context {
+                \Score
+                % This forces LilyPond to allow breaks even if it thinks they look bad
+                \override SpacingSpanner.strict-grace-spacing = ##t
+                \override SpacingSpanner.strict-note-spacing = ##t
+                forbidBreakBetweenBarLines = ##f
+                override BarLine.transparent = ##f
+                % This tells LilyPond "even if the math is wrong, draw the bar and allow a break"
+                barCheckSynchronize = ##t 
+            }
+        }
+    """
+
+    filtered = mido.MidiFile(filtered_mid)
+    print("filtered track count:", len(filtered.tracks))
+    for i, track in enumerate(comp.tracks):
+        print("track", i, "num messages:", len(track))
+        if not track.bars:
+            continue
+
+        # Convert whole track, no dumb string splitting
+        ly = LilyPond.from_Composition(trackToComposition(track))
+        out_path = f"{base_path}_track{i}"
+
+        # If you really need breaks, do it in the track structure
+        # not by splitting the generated text
+        LilyPond.to_png(header + ly, out_path)
+
+
 def mido_parse(file):
     try:
         # Mido's parser is more lenient with SMF specifications
@@ -217,6 +261,82 @@ def force_clean_syx(input_path, output_path):
     except Exception as e:
         print(f"Still failed: {e}")
 
+
+def keep_part(part):
+    inst = part.getInstrument()
+    if inst is None:
+        return True  # keep if unknown, or decide policy
+
+    # percussion channel
+    if hasattr(inst, "midiChannel") and inst.midiChannel == 9:
+        return False
+
+    # unpitched percussion class
+    if isinstance(inst, instrument.UnpitchedPercussion):
+        return False
+
+    # actual unpitched notes in the part
+    if len(part.recurse().getElementsByClass(note.Unpitched)) > 0:
+        return False
+
+    return True
+
+def filter_percussion_tracks(input_mid, output_mid):
+    try:
+        score = converter.parse(input_mid)
+    except Exception as e:
+        raise RuntimeError(f"music21 could not parse {input_mid}: {e}")
+
+    print("Parsed type:", type(score))
+    print("Score repr:", score)
+    #debug info
+    print("score type:", type(score))
+    print("has parts:", hasattr(score, "parts"))
+    if hasattr(score, "parts"):
+        print("parts count:", len(score.parts))
+
+    # Some MIDI files parse as a single Part/Stream instead of a Score
+    parts = []
+    if hasattr(score, "parts"):
+        parts = list(score.parts)
+    if not parts:
+        # find nested parts if this is a single stream
+        parts = list(score.recurse().getElementsByClass(stream.Part))
+
+    if not parts:
+        raise ValueError(f"No musical parts found in {input_mid}. File may be empty or malformed.")
+
+    kept_indexes = []
+
+    for i, part in enumerate(parts):
+        inst = part.getInstrument()
+        print("part", i, "type:", type(part), "instrument:", inst)
+
+        # If the instrument is percussion, drop it
+        if inst is not None and (
+            getattr(inst, "midiChannel", None) == 9 or
+            isinstance(inst, instrument.UnpitchedPercussion)
+        ):
+            continue
+
+        # Also drop obvious unpitched-percussion content
+        if len(part.recurse().getElementsByClass(note.Unpitched)) > 0:
+            continue
+
+        kept_indexes.append(i)
+
+    print("Keeping parts:", kept_indexes)
+
+    filtered = stream.Score()
+    if getattr(score, "metadata", None) is not None:
+        filtered.insert(0, score.metadata)
+
+    for idx in kept_indexes:
+        filtered.insert(0, parts[idx])
+
+    filtered.write('midi', fp=output_mid)
+
+#remove next two
 def music21_parse(input_file, output_file):
     try:
         # music21 parses MIDI into high-level musical 'Streams'
@@ -286,5 +406,25 @@ def process(path=None):
     print(f"Total files parsed: {count}")
 
 import os
-path = file_path = os.path.join(os.getcwd(), "media", "MidiWorld")
-process(path)
+path = os.path.join(os.getcwd(), "media", "MidiWorld")
+if not str(path).endswith("*.mid"): #check that it does with .mid AND is a file
+    path += "/*.mid"
+filtered_mid = "filtered.mid"
+for file in glob.glob(path):
+    stem = os.path.splitext(os.path.basename(file))[0]
+    out_dir = os.path.join(os.getcwd(), "rendered", stem)
+    os.makedirs(out_dir, exist_ok=True)
+
+    filtered_mid = os.path.join(out_dir, f"{stem}_filtered.mid")
+
+    filter_percussion_tracks(file, filtered_mid)
+
+    mid_check = mido.MidiFile(filtered_mid)
+    print("filtered track count:", len(mid_check.tracks))
+
+    compIn, bpm = MidiIn.MIDI_to_Composition(filtered_mid)
+    print("mingus track count:", len(compIn.tracks))
+
+    write_composition(compIn, os.path.join(out_dir, stem))
+
+#process(path)
