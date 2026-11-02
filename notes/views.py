@@ -16,6 +16,8 @@ import mido
 import os
 from urllib.parse import urlparse
 
+#TODO make libMido.py generate better tracks (maybe use base clef for some)
+
 SEARCH_SITES = [mw,] #bm, fm] #TODO add more sites, and create an enum
 
 def trackToComposition(track):

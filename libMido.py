@@ -161,7 +161,7 @@ def write_composition_old(comp, filename, tracks_to_skip=None):
         LilyPond.to_png(header + ly_str, out_base)
 
 def write_composition(comp, base_path):
-    header = r"""
+    header_old = r"""
         \version "2.24.4"
         #(set-global-staff-size 14)
         #(ly:set-option 'crop #t)
@@ -188,6 +188,32 @@ def write_composition(comp, base_path):
         }
     """
 
+    header = r"""
+    \version "2.24.4"
+    #(set-global-staff-size 14)
+    #(set-paper-size "a4")
+
+    \paper {
+    top-margin = 10\mm
+    bottom-margin = 10\mm
+    left-margin = 15\mm
+    line-width = 180\mm
+    }
+
+    \layout {
+    ragged-right = ##f
+    \context {
+        \Score
+        \override SpacingSpanner.strict-grace-spacing = ##t
+        \override SpacingSpanner.strict-note-spacing = ##t
+        forbidBreakBetweenBarLines = ##f
+        \override BarLine.transparent = ##f
+        barCheckSynchronize = ##t
+    }
+    }
+    """
+
+    
     filtered = mido.MidiFile(filtered_mid)
     print("filtered track count:", len(filtered.tracks))
     for i, track in enumerate(comp.tracks):
